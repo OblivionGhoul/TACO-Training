@@ -1,0 +1,16 @@
+path: taco_yolo_dataset
+
+train: images/train
+val: images/val
+
+nc: 8
+
+names:
+  0: Bottle
+  1: Can
+  2: Cup
+  3: Bag
+  4: Wrapper
+  5: Carton
+  6: Cigarette
+  7: Other
