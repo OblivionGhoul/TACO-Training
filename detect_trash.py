@@ -2,7 +2,7 @@ import os
 import cv2
 from ultralytics import YOLO
 
-model = YOLO("runs/detect/train2/weights/best.pt")
+model = YOLO("runs/detect/train/weights/best.pt")
 print("Model classes:", model.names)
 print("Number of classes:", len(model.names))
 

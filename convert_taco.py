@@ -10,14 +10,14 @@ annotations_file = os.path.join(taco_data_path, "annotations.json")
 output_path = "taco_yolo_dataset"
 
 train_img_dir = os.path.join(output_path, "images/train")
-val_img_dir = os.path.join(output_path, "images/val")
+val_img_dir   = os.path.join(output_path, "images/val")
 train_lbl_dir = os.path.join(output_path, "labels/train")
-val_lbl_dir = os.path.join(output_path, "labels/val")
+val_lbl_dir   = os.path.join(output_path, "labels/val")
 
 os.makedirs(train_img_dir, exist_ok=True)
-os.makedirs(val_img_dir, exist_ok=True)
+os.makedirs(val_img_dir,   exist_ok=True)
 os.makedirs(train_lbl_dir, exist_ok=True)
-os.makedirs(val_lbl_dir, exist_ok=True)
+os.makedirs(val_lbl_dir,   exist_ok=True)
 
 CATEGORY_MAP = {
     # Bottle (0)
@@ -97,7 +97,7 @@ CATEGORY_MAP = {
     # Cigarette (6)
     "Cigarette": 6,
 
-    # Other (7) - only truly ambiguous/rare items
+    # Other (7)
     "Battery": 7,
     "Bottle cap": 7,
     "Broken glass": 7,
@@ -114,15 +114,14 @@ CATEGORY_MAP = {
     "Food waste": 7,
 }
 
-print("Loading annotations...")
+print("Loading TACO annotations...")
 with open(annotations_file) as f:
     coco = json.load(f)
 
-images = coco["images"]
+images      = coco["images"]
 annotations = coco["annotations"]
-categories = coco["categories"]
+categories  = coco["categories"]
 
-# Build lookup: original category id -> consolidated class id
 cat_id_to_class = {}
 for cat in categories:
     name = cat["name"]
@@ -130,14 +129,12 @@ for cat in categories:
         cat_id_to_class[cat["id"]] = CATEGORY_MAP[name]
     else:
         print(f"  ⚠️  Unmapped category '{name}' → class 7 (Other)")
-        cat_id_to_class[cat["id"]] = 7  # fallback to Other
+        cat_id_to_class[cat["id"]] = 7
 
-# Build annotation lookup by image id
 ann_map = defaultdict(list)
 for ann in annotations:
     ann_map[ann["image_id"]].append(ann)
 
-# Count annotations per class for reporting
 class_counts = defaultdict(int)
 for ann in annotations:
     cls = cat_id_to_class[ann["category_id"]]
@@ -148,36 +145,32 @@ class_names = ["Bottle", "Can", "Cup", "Bag", "Wrapper", "Carton", "Cigarette", 
 for cls_id, name in enumerate(class_names):
     print(f"  {cls_id}: {name:12s} → {class_counts[cls_id]:4d} annotations")
 
-# Find the maximum class count (excluding Other) to set a cap for Other
 non_other_max = max(class_counts[i] for i in range(7))
-# Cap Other at ~1.5x the largest non-Other class to prevent it dominating
-other_cap = int(non_other_max * 1.5)
+other_cap     = int(non_other_max * 1.5)
 print(f"\n  Max non-Other class: {non_other_max}, capping Other at: {other_cap}")
 print("\nProcessing images...")
-written_other = 0
+
+written_other        = 0
 skipped_other_images = 0
 
 for img in images:
     file_name = img["file_name"]
-    img_id = img["id"]
-    img_path = os.path.join(taco_data_path, file_name)
+    img_id    = img["id"]
+    img_path  = os.path.join(taco_data_path, file_name)
 
     if not os.path.exists(img_path):
         continue
 
-    width = img["width"]
+    width  = img["width"]
     height = img["height"]
 
     img_anns = ann_map.get(img_id, [])
     if not img_anns:
         continue
 
-    # Get the classes present in this image
     classes_in_image = [cat_id_to_class[ann["category_id"]] for ann in img_anns]
-    has_non_other = any(c != 7 for c in classes_in_image)
-    all_other = all(c == 7 for c in classes_in_image)
+    all_other        = all(c == 7 for c in classes_in_image)
 
-    # Skip purely-Other images if we've already hit the cap
     if all_other and written_other >= other_cap:
         skipped_other_images += 1
         continue
@@ -186,20 +179,21 @@ for img in images:
     img_dest = train_img_dir if is_train else val_img_dir
     lbl_dest = train_lbl_dir if is_train else val_lbl_dir
 
-    shutil.copy(img_path, os.path.join(img_dest, os.path.basename(file_name)))
+    dest_name = "taco_" + os.path.basename(file_name)          # prefix to avoid merge collisions
+    shutil.copy(img_path, os.path.join(img_dest, dest_name))
 
-    label_path = os.path.join(lbl_dest, os.path.splitext(os.path.basename(file_name))[0] + ".txt")
+    label_path = os.path.join(lbl_dest, os.path.splitext(dest_name)[0] + ".txt")
     with open(label_path, "w") as f:
         for ann in img_anns:
             x, y, w, h = ann["bbox"]
             x_center = (x + w / 2) / width
             y_center = (y + h / 2) / height
-            w_norm = w / width
-            h_norm = h / height
+            w_norm   = w / width
+            h_norm   = h / height
             class_id = cat_id_to_class[ann["category_id"]]
             if class_id == 7:
                 written_other += 1
             f.write(f"{class_id} {x_center:.6f} {y_center:.6f} {w_norm:.6f} {h_norm:.6f}\n")
 
 print(f"\nConversion complete. Skipped {skipped_other_images} purely-Other images (cap reached).")
-print("YOLO dataset created in:", output_path)
+print("TACO YOLO dataset created in:", output_path)

@@ -4,7 +4,7 @@ model = YOLO("yolov8s.pt")
 
 model.train(
     data="taco.yaml",                 # dataset config (classes, train/val paths)
-    epochs=100,                       # max training iterations
+    epochs=50,                       # max training iterations
     imgsz=768,                        # input image resolution
     batch=8,                          # images processed per step
     device="cpu",                     # run on CPU
